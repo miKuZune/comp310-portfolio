@@ -98,6 +98,28 @@ vblankwait2:
 	LDA #$04
 	STA PPUDATA
 	
+	
+	; Stores sprite colours 0
+	LDA #$1A
+	STA PPUDATA
+	
+	LDA #$15
+	STA PPUDATA
+	
+	LDA #$FD
+	STA PPUDATA
+	
+	; Stores sprite colours 0
+	LDA #$30
+	STA PPUDATA
+	
+	LDA #$20
+	STA PPUDATA
+	
+	LDA #$25
+	STA PPUDATA
+ 
+	
 	; Write sprite data for sprite 0
 	LDA #120	; yPos
 	STA $0200
@@ -108,7 +130,17 @@ vblankwait2:
 	LDA #128	; xPos
 	STA $0203
 	
-	LDA #%10000000	; Enable NMI
+	; Write sprite data for sprite 1
+	LDA #50	; yPos
+	STA $0204
+	LDA #1		; Tile number
+	STA $0205
+	LDA #1		; Attributes
+	STA $0206
+	LDA #50	; xPos
+	STA $0207
+	
+	LDA #%10000001	; Enable NMI
 	STA PPUCTRL
 	
 	LDA #%00010000	;Enable Sprites
@@ -161,5 +193,6 @@ NMI:
 
 	.bank 2
 	.org $0000
+	.incbin "Sprites.nes"
 	
 	
