@@ -98,6 +98,25 @@ vblankwait2:
 	LDA #$04
 	STA PPUDATA
 	
+	; Write sprite data for sprite 0
+	LDA #120	; yPos
+	STA $0200
+	LDA #0		; Tile number
+	STA $0201
+	LDA #0		; Attributes
+	STA $0202
+	LDA #128	; xPos
+	STA $0203
+	
+	LDA #%10000000	; Enable NMI
+	STA PPUCTRL
+	
+	LDA #%00010000	;Enable Sprites
+	STA PPUMASK
+	
+	
+	
+	
 	
 	
 ; starts an infinate loop
@@ -110,6 +129,24 @@ forever:
 
 ; NMI - called every frame
 NMI:
+	;Increment X position
+	LDA $0203
+	CLC
+	ADC #1
+	STA $0203
+	
+	;Increment Y Position
+	LDA $0200
+	CLC
+	ADC #-1
+	STA $0200
+
+	LDA #0
+	STA OAMADDR
+	LDA #$02
+	STA OAMDMA
+	
+
   RTI		; Return from interrupt
 	
 ;----------------------------------------------------------------------------
