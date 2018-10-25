@@ -28,12 +28,12 @@ BUTTON_RIGHT 	= %00000001
 
 	.rsset $0010
 joypad1_state .rs 1
+bullet_active .rs 1
 
 	.rsset $0200
 sprite_player .rs 4
-
-	.rsset $0204
 sprite_2 .rs 4
+sprite_bullet .rs 4
 
 	.rsset $0000
 SPRITE_Y .rs 1
@@ -250,7 +250,41 @@ ReadUp_Done:
 	ADC #1
 	STA sprite_player + SPRITE_Y
 	
-ReadDown_Done:			
+ReadDown_Done:	
+
+;React to A button
+	LDA joypad1_state
+	AND #BUTTON_A
+	BEQ ReadA_Done
+	;Spawn a bullet if one is not active
+	LDA bullet_active
+	BNE ReadA_Done
+	;No bullet active so spawn one.
+	LDA #1
+	STA bullet_active
+	
+	LDA sprite_player + SPRITE_Y	; yPos
+	STA sprite_bullet + SPRITE_Y
+	LDA #2		; Tile number
+	STA sprite_bullet + SPRITE_TILE
+	LDA #0		; Attributes
+	STA sprite_bullet + SPRITE_ATTRIB
+	LDA sprite_player + SPRITE_X	; xPos
+	STA sprite_bullet + SPRITE_X
+ReadA_Done:
+	
+	;Update bullet pos
+	LDA bullet_active
+	BEQ UpdateBullet_Done ; If bullet active = 0 skip the bullet code
+	LDA sprite_bullet + SPRITE_Y
+	SEC
+	SBC #1
+	STA sprite_bullet + SPRITE_Y
+	BCS UpdateBullet_Done
+	; If carry flag is clear the bullet has left the screen, therefore we can destroy it.
+	LDA #0
+	STA bullet_active
+UpdateBullet_Done:
 	
 	
 	;copy sprite data to the PPU.
