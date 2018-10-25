@@ -26,20 +26,32 @@ BUTTON_DOWN 	= %00000100
 BUTTON_LEFT 	= %00000010
 BUTTON_RIGHT 	= %00000001
 
+ENEMY_SQUAD_WIDTH = 6
+ENEMY_SQUAD_HEIGHT = 4
+NUM_ENEMIES = ENEMY_SQUAD_WIDTH * ENEMY_SQUAD_HEIGHT
+ENEMY_SPACING = 16
+ENEMY_DESCENT_SPEED = 4
+
 	.rsset $0010
 joypad1_state .rs 1
 bullet_active .rs 1
+temp_x .rs 1
+temp_y .rs 1
+enemy_info .rs 4 * NUM_ENEMIES
 
 	.rsset $0200
 sprite_player .rs 4
-sprite_2 .rs 4
 sprite_bullet .rs 4
+sprite_enemy0 .rs 4 * NUM_ENEMIES
 
 	.rsset $0000
 SPRITE_Y .rs 1
 SPRITE_TILE .rs 1
 SPRITE_ATTRIB .rs 1
 SPRITE_X .rs 1
+ENEMY_SPEED .rs 1
+
+
 
 
 
@@ -150,7 +162,7 @@ vblankwait2:
 	STA PPUDATA
  
 	
-	; Write sprite data for sprite 0
+	; Write sprite data for sprite 0 (the player)
 	LDA #120	; yPos
 	STA sprite_player + SPRITE_Y
 	LDA #0		; Tile number
@@ -160,15 +172,42 @@ vblankwait2:
 	LDA #128	; xPos
 	STA sprite_player + SPRITE_X
 	
-	; Write sprite data for sprite 1
-	LDA #50	; yPos
-	STA sprite_2 + SPRITE_Y
-	LDA #1		; Tile number
-	STA sprite_2 + SPRITE_TILE
-	LDA #1		; Attributes
-	STA sprite_2 + SPRITE_ATTRIB
-	LDA #50	; xPos
-	STA sprite_2 + SPRITE_X
+	; Initialise enemies
+	LDX #0
+	LDA #ENEMY_SQUAD_HEIGHT * ENEMY_SPACING
+	STA temp_y
+InitEnemiesLoopY:
+	LDA #ENEMY_SQUAD_WIDTH * ENEMY_SPACING
+	STA temp_x
+InitEnemiesLoopX:
+	; Accumlator = temp_x here
+	STA sprite_enemy0 + SPRITE_X, x
+	LDA temp_y
+	STA sprite_enemy0 + SPRITE_Y, x
+	LDA #1
+	STA sprite_enemy0 + SPRITE_TILE, x
+	LDA #0
+	STA sprite_enemy0 + SPRITE_ATTRIB, x
+	LDA #1
+	STA enemy_info+ENEMY_SPEED, x
+	; Increase X by 4 per loop (one for each bit used in sprite data).
+	TXA
+	CLC
+	ADC #4
+	TAX
+	; Loop check for x value
+	LDA temp_x
+	SEC
+	SBC #ENEMY_SPACING
+	STA temp_x
+	BNE InitEnemiesLoopX
+	; Loop check for y value
+	LDA temp_y
+	SEC
+	SBC #ENEMY_SPACING
+	STA temp_y
+	BNE InitEnemiesLoopY
+	
 	
 	LDA #%10000001	; Enable NMI
 	STA PPUCTRL
@@ -286,6 +325,37 @@ ReadA_Done:
 	STA bullet_active
 UpdateBullet_Done:
 	
+	;Update Enemies
+	LDX #(NUM_ENEMIES - 1) * 4
+	LDY #(NUM_ENEMIES - 1)
+UpdateEnemiesLoop:
+	LDA sprite_enemy0 + SPRITE_X, x
+	CLC
+	ADC enemy_info + ENEMY_SPEED, x
+	STA sprite_enemy0 + SPRITE_X, x
+	CMP #256 - ENEMY_SPACING
+	BCS UpdateEnemies_Reverse
+	CMP #ENEMY_SPACING
+	BCC UpdateEnemies_Reverse
+	JMP UpdateEnemies_NoReverse
+UpdateEnemies_Reverse:
+	; Reverse Enemy Direction
+	LDA #0
+	SEC
+	SBC enemy_info+ENEMY_SPEED, x
+	STA enemy_info+ENEMY_SPEED, x
+	LDA sprite_enemy0+SPRITE_Y, x
+	CLC
+	ADC #ENEMY_DESCENT_SPEED
+	STA sprite_enemy0+SPRITE_Y, x
+	
+UpdateEnemies_NoReverse
+	TXA 			; Decrement x{
+	CLC
+	ADC #-4
+	TAX				; }
+	DEY				; Decremnt y
+	BPL UpdateEnemiesLoop
 	
 	;copy sprite data to the PPU.
 	LDA #0
