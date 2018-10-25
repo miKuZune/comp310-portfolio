@@ -14,6 +14,9 @@ PPUSCROLL = $2005
 PPUADDR = $2006
 PPUDATA = $2007
 OAMDMA = $4014
+JOYPAD1 = $4016
+JOYPAD2 = $4017
+
 
 	bank 0
 	.org $C000
@@ -74,7 +77,9 @@ CLRMEM:
 
     ; Other things you can do between vblank waits are set up audio
     ; or set up other mapper registers.
-   
+  
+
+  
 vblankwait2:
     BIT PPUSTATUS
     BPL vblankwait2
@@ -161,18 +166,33 @@ forever:
 
 ; NMI - called every frame
 NMI:
-	;Increment X position
+	LDA #1
+	STA JOYPAD1
+	LDA #0
+	STA JOYPAD1
+	
+	;Read button A
+	LDA JOYPAD1
+	AND #%00000001 
+	BEQ ReadA_Done	;Pretty much just an if statement if((Joypad1 && 1) != 0){
 	LDA $0203
 	CLC
 	ADC #1
-	STA $0203
-	
-	;Increment Y Position
-	LDA $0200
+	STA $0203		
+ReadA_Done:			;}
+
+	;Read button B
+	LDA JOYPAD1
+	AND #%00000001
+	BEQ ReadB_Done
+	LDA $0203
 	CLC
 	ADC #-1
-	STA $0200
-
+	STA $0203
+ReadB_Done:			;}
+	
+	
+	;copy sprite data to the PPU.
 	LDA #0
 	STA OAMADDR
 	LDA #$02
@@ -180,6 +200,8 @@ NMI:
 	
 
   RTI		; Return from interrupt
+  
+
 	
 ;----------------------------------------------------------------------------
 
