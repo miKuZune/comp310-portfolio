@@ -29,6 +29,18 @@ BUTTON_RIGHT 	= %00000001
 	.rsset $0010
 joypad1_state .rs 1
 
+	.rsset $0200
+sprite_player .rs 4
+
+	.rsset $0204
+sprite_2 .rs 4
+
+	.rsset $0000
+SPRITE_Y .rs 1
+SPRITE_TILE .rs 1
+SPRITE_ATTRIB .rs 1
+SPRITE_X .rs 1
+
 
 
 	bank 0
@@ -140,23 +152,23 @@ vblankwait2:
 	
 	; Write sprite data for sprite 0
 	LDA #120	; yPos
-	STA $0200
+	STA sprite_player + SPRITE_Y
 	LDA #0		; Tile number
-	STA $0201
+	STA sprite_player + SPRITE_TILE
 	LDA #0		; Attributes
-	STA $0202
+	STA sprite_player + SPRITE_ATTRIB
 	LDA #128	; xPos
-	STA $0203
+	STA sprite_player + SPRITE_X
 	
 	; Write sprite data for sprite 1
 	LDA #50	; yPos
-	STA $0204
+	STA sprite_2 + SPRITE_Y
 	LDA #1		; Tile number
-	STA $0205
+	STA sprite_2 + SPRITE_TILE
 	LDA #1		; Attributes
-	STA $0206
+	STA sprite_2 + SPRITE_ATTRIB
 	LDA #50	; xPos
-	STA $0207
+	STA sprite_2 + SPRITE_X
 	
 	LDA #%10000001	; Enable NMI
 	STA PPUCTRL
@@ -201,20 +213,20 @@ ReadController:
 	LDA joypad1_state
 	AND #BUTTON_RIGHT
 	BEQ ReadRight_Done
-	LDA $0203
+	LDA sprite_player + SPRITE_X
 	CLC
 	ADC #1
-	STA $0203
+	STA sprite_player + SPRITE_X
 ReadRight_Done:
 
 	;React to Left button
 	LDA joypad1_state
 	AND #BUTTON_LEFT
 	BEQ ReadLeft_Done
-	LDA $0203
+	LDA sprite_player + SPRITE_X
 	CLC
 	ADC #-1
-	STA $0203
+	STA sprite_player + SPRITE_X
 	
 ReadLeft_Done:
 
@@ -222,10 +234,10 @@ ReadLeft_Done:
 	LDA joypad1_state
 	AND #BUTTON_UP
 	BEQ ReadUp_Done
-	LDA $0200
+	LDA sprite_player + SPRITE_Y
 	CLC
 	ADC #-1
-	STA $0200
+	STA sprite_player + SPRITE_Y
 	
 ReadUp_Done:	
 
@@ -233,10 +245,10 @@ ReadUp_Done:
 	LDA joypad1_state
 	AND #BUTTON_DOWN
 	BEQ ReadDown_Done
-	LDA $0200
+	LDA sprite_player + SPRITE_Y
 	CLC
 	ADC #1
-	STA $0200
+	STA sprite_player + SPRITE_Y
 	
 ReadDown_Done:			
 	
