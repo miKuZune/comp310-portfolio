@@ -50,6 +50,15 @@ SPRITE_TILE .rs 1
 SPRITE_ATTRIB .rs 1
 SPRITE_X .rs 1
 ENEMY_SPEED .rs 1
+ENEMY_ALIVE .rs 1
+
+ENEMY_HITBOX_WIDTH = 8
+ENEMY_HITBOX_HEIGHT = 8
+
+BULLET_HITBOX_WIDTH = 8
+BULLET_HITBOX_HEIGHT = 7
+BULLET_X = 0
+BULLET_Y = 1
 
 
 
@@ -123,6 +132,19 @@ vblankwait2:
 	
 	; end of initialisation code
 	
+	JSR InitaliseGame
+	
+	LDA #%10000001	; Enable NMI
+	STA PPUCTRL
+	
+	LDA #%00010000	;Enable Sprites
+	STA PPUMASK	
+	; -------------------------------------------------	
+; starts an infinate loop
+forever:
+  JMP forever
+  
+InitaliseGame: ; Begin subroutine
 	
 	; Reset the PPU high/low latch
 	LDA PPUSTATUS
@@ -184,12 +206,12 @@ InitEnemiesLoopX:
 	STA sprite_enemy0 + SPRITE_X, x
 	LDA temp_y
 	STA sprite_enemy0 + SPRITE_Y, x
-	LDA #1
-	STA sprite_enemy0 + SPRITE_TILE, x
 	LDA #0
 	STA sprite_enemy0 + SPRITE_ATTRIB, x
 	LDA #1
+	STA sprite_enemy0 + SPRITE_TILE, x
 	STA enemy_info+ENEMY_SPEED, x
+	STA enemy_info+ENEMY_ALIVE, x
 	; Increase X by 4 per loop (one for each bit used in sprite data).
 	TXA
 	CLC
@@ -208,21 +230,7 @@ InitEnemiesLoopX:
 	STA temp_y
 	BNE InitEnemiesLoopY
 	
-	
-	LDA #%10000001	; Enable NMI
-	STA PPUCTRL
-	
-	LDA #%00010000	;Enable Sprites
-	STA PPUMASK
-	
-	
-	
-	
-	
-	
-; starts an infinate loop
-forever:
-  JMP forever
+	RTS ; End subroutine
   
 ; end of inifnate loop
   
@@ -329,6 +337,11 @@ UpdateBullet_Done:
 	LDX #(NUM_ENEMIES - 1) * 4
 	LDY #(NUM_ENEMIES - 1)
 UpdateEnemiesLoop:
+	;Check if enemy is alive
+	LDA enemy_info + ENEMY_ALIVE, x
+	BNE UpdateEnemies_Start
+	JMP UpdateEnemies_Next
+UpdateEnemies_Start:
 	LDA sprite_enemy0 + SPRITE_X, x
 	CLC
 	ADC enemy_info + ENEMY_SPEED, x
@@ -348,14 +361,77 @@ UpdateEnemies_Reverse:
 	CLC
 	ADC #ENEMY_DESCENT_SPEED
 	STA sprite_enemy0+SPRITE_Y, x
+		
+UpdateEnemies_NoReverse 
+											 ;\1		\2		\3				\4			\5			\6			\7
+CheckCollisionWithEnemy .macro ; parameters: object_x, object_y, object_hit_x, object_hit_y, object_w, object_h, no_collision_label
+	; If there is a collision, execution continues immediately after this macro
+	; Else, jump to no_collision_label
+	; Check if enemy collides with bullet.
+	LDA sprite_enemy0+SPRITE_X,x 	; Calculate enemyPosX - bulletWidth - 1 (x1 - w2 - 1)
+	.if \3 > 0
+	SEC
+	SBC \3
+	.endif
+	SEC
+	SBC \5+1						; Assumes all sprites have a size of 8 pixels
+	CMP \1							; Compare against bullet x2
+	BCS \7							; Branch if x1 -w2 >= x2
 	
-UpdateEnemies_NoReverse
+	CLC
+	ADC #\5+1+ENEMY_HITBOX_WIDTH	; Calculate xEnemy + wEnemy (x1+w1) assuming w1 = 8
+	CMP \1							; Compare x1+w1 < x2
+	BCC \7
+	
+	LDA sprite_enemy0+SPRITE_Y,x 	; Calculate enemyPosy - bulletWidth (y1 - h2)
+	.if \3 > 0
+	SEC
+	SBC \4
+	.endif
+	SEC
+	SBC \6+1						; Assumes all sprites have a size of 8 pixels
+	CMP \2							; Compare against bullet y2
+	BCS \7						 	; Branch if y1 -h2 >= y2
+	
+	CLC
+	ADC \6+1+ENEMY_HITBOX_HEIGHT	; Calculate yEnemy + hEnemy (y1+h1) assuming h1 = 8
+	CMP \2							; Compare y1+h1 < y2
+	BCC \7
+	 
+	
+
+	.endm
+	
+	; CheckCollisionWithEnemy
+	CheckCollisionWithEnemy sprite_bullet+SPRITE_X, sprite_bullet+SPRITE_Y, #BULLET_X, #BULLET_Y, #BULLET_HITBOX_WIDTH, #BULLET_HITBOX_HEIGHT, UpdateEnemies_NoCollision
+	; Handle collision
+	LDA #0							; Destroy bullet
+	STA bullet_active				; Stop bullet from moving
+	STA enemy_info+ENEMY_ALIVE, x	; Stop enemy from moving.
+	LDA #$FF						; Store value of 255
+	STA sprite_bullet + SPRITE_Y	; Move bullet to position 255 (offscreen)
+	STA sprite_enemy0+SPRITE_Y, x	; Move Enemy offscreen
+UpdateEnemies_NoCollision:
+
+	; Check collision with player character
+	CheckCollisionWithEnemy sprite_player+SPRITE_X, sprite_player+SPRITE_Y, #0, #0, #8, #8, UpdateEnemies_NoCollisionWithPlayer
+	
+	;Handle collision
+	JSR InitaliseGame
+	JMP UpdateEnemies_End
+	
+UpdateEnemies_NoCollisionWithPlayer:
+
+UpdateEnemies_Next:
+	
 	TXA 			; Decrement x{
 	CLC
 	ADC #-4
 	TAX				; }
 	DEY				; Decremnt y
-	BPL UpdateEnemiesLoop
+	BMI UpdateEnemies_End
+	JMP UpdateEnemiesLoop
+UpdateEnemies_End:
 	
 	;copy sprite data to the PPU.
 	LDA #0
