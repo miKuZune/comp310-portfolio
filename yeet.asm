@@ -158,29 +158,51 @@ InitaliseGame: ; Begin subroutine
 	LDA #$10
 	STA PPUADDR
 	
-	; Write address $3f10 to the PPU
-	LDA #$04
+	; Write the colour to the PPU.
+	LDA #$04					; Defines the colour
 	STA PPUDATA
 	
 	
-	; Stores sprite colours 0
-	LDA #$1A
+	; Write colour palletes
+	; Stores sprite colours for the enemies
+	LDA #$19
 	STA PPUDATA
 	
-	LDA #$15
+	LDA #$09
 	STA PPUDATA
 	
-	LDA #$FD
-	STA PPUDATA
-	
-	; Stores sprite colours 0
 	LDA #$30
+	STA PPUDATA
+	
+	; Stores sprite colours for the player
+	LDA #$06
+	STA PPUDATA
+	
+	LDA #$30
+	STA PPUDATA
+	
+	LDA #$36
+	STA PPUDATA
+	
+	; Stores sprite colours for the arrow
+	
+	LDA #$17
+	STA PPUDATA
+	
+	LDA #$00
 	STA PPUDATA
 	
 	LDA #$20
 	STA PPUDATA
 	
-	LDA #$25
+	; Store sprite colours for the handle
+	LDA #$36
+	STA PPUDATA
+	
+	LDA #$11
+	STA PPUDATA
+	
+	LDA #$33
 	STA PPUDATA
  
 	
@@ -189,7 +211,7 @@ InitaliseGame: ; Begin subroutine
 	STA sprite_player + SPRITE_Y
 	LDA #0		; Tile number
 	STA sprite_player + SPRITE_TILE
-	LDA #0		; Attributes
+	LDA #1		; Attributes
 	STA sprite_player + SPRITE_ATTRIB
 	LDA #128	; xPos
 	STA sprite_player + SPRITE_X
@@ -314,7 +336,7 @@ ReadDown_Done:
 	STA sprite_bullet + SPRITE_Y
 	LDA #2		; Tile number
 	STA sprite_bullet + SPRITE_TILE
-	LDA #0		; Attributes
+	LDA #2		; Attributes
 	STA sprite_bullet + SPRITE_ATTRIB
 	LDA sprite_player + SPRITE_X	; xPos
 	STA sprite_bullet + SPRITE_X
