@@ -35,13 +35,17 @@ ENEMY_DESCENT_SPEED = 4
 	.rsset $0010
 joypad1_state .rs 1
 bullet_active .rs 1
+hand_active .rs 1
 temp_x .rs 1
 temp_y .rs 1
+hand_framesActive .rs 1
+hand_framesToDespawn .rs 1
 enemy_info .rs 4 * NUM_ENEMIES
 
 	.rsset $0200
 sprite_player .rs 4
 sprite_bullet .rs 4
+sprite_hand .rs 4
 sprite_enemy0 .rs 4 * NUM_ENEMIES
 
 	.rsset $0000
@@ -195,7 +199,7 @@ InitaliseGame: ; Begin subroutine
 	LDA #$20
 	STA PPUDATA
 	
-	; Store sprite colours for the handle
+	; Store sprite colours for the hand
 	LDA #$36
 	STA PPUDATA
 	
@@ -204,6 +208,10 @@ InitaliseGame: ; Begin subroutine
 	
 	LDA #$33
 	STA PPUDATA
+	
+	; Define data for hand time alive
+	LDA #60
+	STA hand_framesToDespawn
  
 	
 	; Write sprite data for sprite 0 (the player)
@@ -332,15 +340,43 @@ ReadDown_Done:
 	LDA #1
 	STA bullet_active
 	
+	; Set the bullet position to the be the player's position.
 	LDA sprite_player + SPRITE_Y	; yPos
 	STA sprite_bullet + SPRITE_Y
-	LDA #2		; Tile number
+	LDA #2		; Sprirte sheet tile number
 	STA sprite_bullet + SPRITE_TILE
-	LDA #2		; Attributes
+	LDA #2		; Colour palette attribute.
 	STA sprite_bullet + SPRITE_ATTRIB
 	LDA sprite_player + SPRITE_X	; xPos
 	STA sprite_bullet + SPRITE_X
 ReadA_Done:
+
+;React to B button
+	
+	LDA joypad1_state
+	AND #BUTTON_B
+	BEQ ReadB_Done
+	
+	;Spawn Hand if not active
+	LDA hand_active
+	BNE ReadB_Done
+	;Spawn hand
+	LDA #1
+	STA hand_active
+	LDA hand_framesToDespawn
+	STA hand_framesActive
+	
+	; Set the hand's position and attributes.
+	LDA sprite_player + SPRITE_Y
+	STA sprite_hand + SPRITE_Y
+	LDA #3			; Sprite sheet tile number
+	STA sprite_hand + SPRITE_TILE
+	LDA #3			; Colour palette attribute.
+	STA sprite_hand + SPRITE_ATTRIB
+	LDA sprite_player + SPRITE_X
+	STA sprite_hand + SPRITE_X
+
+ReadB_Done:
 	
 	;Update bullet pos
 	LDA bullet_active
@@ -353,7 +389,22 @@ ReadA_Done:
 	; If carry flag is clear the bullet has left the screen, therefore we can destroy it.
 	LDA #0
 	STA bullet_active
+	
 UpdateBullet_Done:
+
+; Handle the hand rendering
+	LDA hand_active
+	BEQ HandUpdate_Done		; Skip if the hand is not active.
+	LDA hand_framesActive
+	SEC
+	SBC #1
+	STA hand_framesActive
+	BNE HandUpdate_Done
+	LDA #0	
+	STA hand_active
+	STA sprite_hand + SPRITE_Y
+	
+HandUpdate_Done:
 	
 	;Update Enemies
 	LDX #(NUM_ENEMIES - 1) * 4
