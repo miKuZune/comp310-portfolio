@@ -517,7 +517,6 @@ UpdateEnemies_Start:
 
 	LDA enemy_info + ENEMY_FOLLOWING, x		; Check if the enemy is following the player.
 	BNE EnemiesInFormation					; Branch to after if not.
-
 	
 	LDA sprite_player + SPRITE_X			; Load players's x pos.
 	STA sprite_enemy0 + SPRITE_X, x			; Set enemies x pos to players.
@@ -635,6 +634,19 @@ UpdateEnemies_NoHandCollision:
 UpdateEnemies_NoCollisionWithPlayer:
 
 
+
+
+UpdateEnemies_Next:
+	
+	TXA 			; Decrement x{
+	CLC
+	ADC #-4
+	TAX				; }
+	DEY				; Decremnt y
+	BMI UpdateEnemies_End
+	JMP UpdateEnemiesLoop
+UpdateEnemies_End:
+	
 CheckCollisionWithPlayer .macro; parameters: objectX, objectY, object_hit_x, object_hit_y, object_w, object_h, no_collision_label
 	; If there is a collision the code will continue from after the macro.
 	; If there is no collision then it will continue from the no_collision_label
@@ -676,23 +688,24 @@ CheckCollisionWithPlayer .macro; parameters: objectX, objectY, object_hit_x, obj
 	CheckCollisionWithPlayer sprite_bullet_enemy+SPRITE_X, sprite_bullet_enemy+SPRITE_Y, #0, #0, #8, #8, UpdatePlayer_NoEnemyBulletCollision
 	
 	; Handle player + enemy bullet collision.
-	;JSR InitaliseGame
-	;JMP UpdateEnemies_End
-	LDA #0
-	STA HAS_FOLLOWER
+	LDA HAS_FOLLOWER
+	BEQ NoFollower_OnCollision
+
+	; If there is a follower this code will run.
+	LDA #0						; Store 0 to represent false.
+	STA HAS_FOLLOWER			; Set the Has_Follower to false.
+	LDA #$FF 					; Store hex equivalent to 255
+	STA sprite_bullet_enemy + SPRITE_Y		; Move sprite off the screen.
+	
+	JMP UpdatePlayer_NoEnemyBulletCollision		; Jump to the end of the bullet collision with player code.
+	
+NoFollower_OnCollision:			; No follower will result in this code being run.
+	JSR InitaliseGame
+	JMP UpdateEnemies_End
+
 	
 UpdatePlayer_NoEnemyBulletCollision:
-
-UpdateEnemies_Next:
 	
-	TXA 			; Decrement x{
-	CLC
-	ADC #-4
-	TAX				; }
-	DEY				; Decremnt y
-	BMI UpdateEnemies_End
-	JMP UpdateEnemiesLoop
-UpdateEnemies_End:
 	
 	;copy sprite data to the PPU.
 	LDA #0
