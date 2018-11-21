@@ -36,6 +36,7 @@ ENEMY_DESCENT_SPEED = 4
 joypad1_state .rs 1
 bullet_active .rs 1
 bullet_active_follower .rs 1
+bullet_active_enemy .rs 1	
 hand_active .rs 1
 temp_x .rs 1
 temp_y .rs 1
@@ -49,6 +50,7 @@ sprite_bullet .rs 4
 sprite_bullet_follower .rs 4
 sprite_hand .rs 4
 sprite_enemy0 .rs 4 * NUM_ENEMIES
+sprite_bullet_enemy .rs 4
 
 	.rsset $0000
 SPRITE_Y .rs 1
@@ -230,9 +232,20 @@ InitaliseGame: ; Begin subroutine
 	LDA #0		; Tile number
 	STA sprite_player + SPRITE_TILE
 	LDA #1		; Attributes
+	ORA #%01000000
 	STA sprite_player + SPRITE_ATTRIB
 	LDA #128	; xPos
 	STA sprite_player + SPRITE_X
+	
+	; Write sprite data for enemy bullet.
+	LDA #60
+	STA sprite_bullet_enemy + SPRITE_Y
+	LDA #16
+	STA sprite_bullet_enemy + SPRITE_TILE
+	LDA #0
+	STA sprite_bullet_enemy + SPRITE_ATTRIB
+	LDA #128
+	STA sprite_bullet_enemy + SPRITE_X
 	
 	; Initialise enemies
 	LDX #0
@@ -440,6 +453,11 @@ UpdateBullet_Done:
 	
 UpdateBullet_Done_Follower:
 
+	; Update enemies bullet.
+	LDA sprite_bullet_enemy + SPRITE_Y
+	ADC #1
+	STA sprite_bullet_enemy + SPRITE_Y
+
 ; Handle the hand rendering
 	LDA hand_active
 	BEQ HandUpdate_Done		; Skip if the hand is not active.
@@ -466,6 +484,8 @@ UpdateEnemies_Start:
 
 	LDA enemy_info + ENEMY_FOLLOWING, x		; Check if the enemy is following the player.
 	BNE EnemiesInFormation					; Branch to after if not.
+
+	
 	LDA sprite_player + SPRITE_X			; Load players's x pos.
 	STA sprite_enemy0 + SPRITE_X, x			; Set enemies x pos to players.
 	LDA sprite_player + SPRITE_Y			; Load player's y pos
@@ -498,7 +518,7 @@ UpdateEnemies_NoReverse
 CheckCollisionWithEnemy .macro ; parameters: object_x, object_y, object_hit_x, object_hit_y, object_w, object_h, no_collision_label
 	; If there is a collision, execution continues immediately after this macro
 	; Else, jump to no_collision_label
-	; Check if enemy collides with bullet.
+	; Check if enemy collides with object.
 	LDA sprite_enemy0+SPRITE_X,x 	; Calculate enemyPosX - bulletWidth - 1 (x1 - w2 - 1)
 	.if \3 > 0
 	SEC
@@ -506,7 +526,7 @@ CheckCollisionWithEnemy .macro ; parameters: object_x, object_y, object_hit_x, o
 	.endif
 	SEC
 	SBC \5+1						; Assumes all sprites have a size of 8 pixels
-	CMP \1							; Compare against bullet x2
+	CMP \1							; Compare against object x2
 	BCS \7							; Branch if x1 -w2 >= x2
 	
 	CLC
@@ -514,24 +534,22 @@ CheckCollisionWithEnemy .macro ; parameters: object_x, object_y, object_hit_x, o
 	CMP \1							; Compare x1+w1 < x2
 	BCC \7
 	
-	LDA sprite_enemy0+SPRITE_Y,x 	; Calculate enemyPosy - bulletWidth (y1 - h2)
+	LDA sprite_enemy0+SPRITE_Y,x 	; Calculate enemyPosy - objectWidth (y1 - h2)
 	.if \3 > 0
 	SEC
 	SBC \4
 	.endif
 	SEC
 	SBC \6+1						; Assumes all sprites have a size of 8 pixels
-	CMP \2							; Compare against bullet y2
+	CMP \2							; Compare against object y2
 	BCS \7						 	; Branch if y1 -h2 >= y2
 	
 	CLC
 	ADC \6+1+ENEMY_HITBOX_HEIGHT	; Calculate yEnemy + hEnemy (y1+h1) assuming h1 = 8
 	CMP \2							; Compare y1+h1 < y2
 	BCC \7
-	 
 	
-
-	.endm
+	.endm							; End macro
 	
 	; Check Bullet Collision With Enemy
 	CheckCollisionWithEnemy sprite_bullet+SPRITE_X, sprite_bullet+SPRITE_Y, #BULLET_X, #BULLET_Y, #BULLET_HITBOX_WIDTH, #BULLET_HITBOX_HEIGHT, UpdateEnemies_NoCollision
@@ -558,16 +576,18 @@ UpdateEnemies_NoCollisionWithFollowerBullet:
 	; Check hand collision with enemy
 	CheckCollisionWithEnemy sprite_hand+SPRITE_X, sprite_hand+SPRITE_Y, #HAND_X, #HAND_Y, #HAND_HITBOX_WIDTH, #HAND_HITBOX_HEIGHT, UpdateEnemies_NoHandCollision
 	; Handle hand enemy collision.
+	
 	LDA #0										; Load 0 into accumulator
 	STA hand_active								; Set the hand to inactive.
 	STA enemy_info+ENEMY_FOLLOWING, x 			; Stop the enemy from moving
 	LDA #$FF
 	STA sprite_hand + SPRITE_Y					; Move hand offscreen
+	
 	LDA #2										; Load new colour palette id into accumulator
 	STA sprite_enemy0 + SPRITE_ATTRIB, x		; Change the colour palette for the enemy.
 	LDA #1										; Store 1/true in the accumulator
 	STA HAS_FOLLOWER							; Store that the player has a follower now.
-	
+
 	
 UpdateEnemies_NoHandCollision:
 	
@@ -579,6 +599,55 @@ UpdateEnemies_NoHandCollision:
 	JMP UpdateEnemies_End
 	
 UpdateEnemies_NoCollisionWithPlayer:
+
+
+CheckCollisionWithPlayer .macro; parameters: objectX, objectY, object_hit_x, object_hit_y, object_w, object_h, no_collision_label
+	; If there is a collision the code will continue from after the macro.
+	; If there is no collision then it will continue from the no_collision_label
+	
+	LDA sprite_player+SPRITE_X 	; Calculate enemyPosX - bulletWidth - 1 (x1 - w2 - 1)
+	.if \3 > 0
+	SEC
+	SBC \3
+	.endif
+	SEC
+	SBC \5+1						; Assumes all sprites have a size of 8 pixels
+	CMP \1							; Compare against object x2
+	BCS \7							; Branch if x1 -w2 >= x2
+	
+	CLC
+	ADC #\5+1+ENEMY_HITBOX_WIDTH	; Calculate xEnemy + wEnemy (x1+w1) assuming w1 = 8. Uses the same hitbox width and heights as the player and enemy sprites are both 8x8.
+	CMP \1							; Compare x1+w1 < x2
+	BCC \7
+	
+	LDA sprite_player+SPRITE_Y 	; Calculate enemyPosy - objectWidth (y1 - h2)
+	.if \3 > 0
+	SEC
+	SBC \4
+	.endif
+	SEC
+	SBC \6+1						; Assumes all sprites have a size of 8 pixels
+	CMP \2							; Compare against object y2
+	BCS \7						 	; Branch if y1 -h2 >= y2
+	
+	CLC
+	ADC \6+1+ENEMY_HITBOX_HEIGHT	; Calculate yEnemy + hEnemy (y1+h1) assuming h1 = 8
+	CMP \2							; Compare y1+h1 < y2
+	BCC \7
+	
+	.endm							; End macro
+
+	
+	; Check if enemy bullet collides with player.
+	CheckCollisionWithPlayer sprite_bullet_enemy+SPRITE_X, sprite_bullet_enemy+SPRITE_Y, #0, #0, #8, #8, UpdatePlayer_NoEnemyBulletCollision
+	
+	; Handle player + enemy bullet collision.
+	;JSR InitaliseGame
+	;JMP UpdateEnemies_End
+	LDA #0
+	STA HAS_FOLLOWER
+	
+UpdatePlayer_NoEnemyBulletCollision:
 
 UpdateEnemies_Next:
 	
