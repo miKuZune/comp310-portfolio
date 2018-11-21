@@ -44,12 +44,14 @@ hand_framesActive .rs 1
 hand_framesToDespawn .rs 1
 enemy_info .rs 4 * NUM_ENEMIES
 
+
 	.rsset $0200
 sprite_player .rs 4
 sprite_bullet .rs 4 
 sprite_bullet_follower .rs 4
 sprite_hand .rs 4
 sprite_enemy0 .rs 4 * NUM_ENEMIES
+sprite_follower .rs 4
 sprite_bullet_enemy .rs 4
 
 	.rsset $0000
@@ -246,6 +248,14 @@ InitaliseGame: ; Begin subroutine
 	STA sprite_bullet_enemy + SPRITE_ATTRIB
 	LDA #128
 	STA sprite_bullet_enemy + SPRITE_X
+	
+	; Write sprite data for follower
+	LDA #$FF
+	STA sprite_follower + SPRITE_Y
+	LDA #1
+	STA sprite_follower + SPRITE_TILE
+	STA sprite_follower + SPRITE_ATTRIB
+	STA sprite_follower + SPRITE_X
 	
 	; Initialise enemies
 	LDX #0
@@ -471,6 +481,29 @@ UpdateBullet_Done_Follower:
 	STA sprite_hand + SPRITE_Y 	; Set the hand's y position to offscreen.
 	
 HandUpdate_Done:
+
+	LDA HAS_FOLLOWER
+	BEQ No_Follower
+	
+
+Has_Follower:
+
+	LDA sprite_player + SPRITE_Y
+	ADC #10
+	STA sprite_follower + SPRITE_Y
+	LDA sprite_player + SPRITE_X
+	STA sprite_follower + SPRITE_X
+	JMP FollowerUpdate_Done
+
+No_Follower:
+	LDA #$FF
+	STA sprite_follower + SPRITE_Y
+	
+	LDA #0
+	STA sprite_follower + SPRITE_X
+	
+
+FollowerUpdate_Done:
 	
 	;Update Enemies
 	LDX #(NUM_ENEMIES - 1) * 4
@@ -579,9 +612,10 @@ UpdateEnemies_NoCollisionWithFollowerBullet:
 	
 	LDA #0										; Load 0 into accumulator
 	STA hand_active								; Set the hand to inactive.
-	STA enemy_info+ENEMY_FOLLOWING, x 			; Stop the enemy from moving
+	STA enemy_info+ENEMY_ALIVE, x 				; Stop the enemy from moving
 	LDA #$FF
 	STA sprite_hand + SPRITE_Y					; Move hand offscreen
+	STA sprite_enemy0 + SPRITE_Y, x
 	
 	LDA #2										; Load new colour palette id into accumulator
 	STA sprite_enemy0 + SPRITE_ATTRIB, x		; Change the colour palette for the enemy.
