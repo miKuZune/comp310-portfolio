@@ -46,6 +46,7 @@ bullet_active_enemy .rs 1 * NUM_ENEMY_BULLETS		; Store whether the enemies bulle
 hand_active .rs 1									; Store whether the player's hand to gain followers is active.
 temp_x .rs 1
 temp_y .rs 1
+temp_value .rs 1
 hand_framesActive .rs 1					; Counts down frames 
 hand_framesToDespawn .rs 1				; Stores how many frames 
 enemy_info .rs 4 * NUM_ENEMIES
@@ -68,7 +69,6 @@ SPRITE_TILE .rs 1		; Sprite's sprite sheet tile - +2
 SPRITE_ATTRIB .rs 1		; Sprite's colour palette - +3
 SPRITE_X .rs 1			; Sprite's xPos - +4
 
-	.rsset $0000
 ENEMY_SPEED .rs 1		; Store's how many pixels the enemies move per frame.
 ENEMY_ALIVE .rs 1		; Store's whether the enemy is alive or not. Used to decide if the enemy should be skipped in the loop.
 
@@ -248,17 +248,6 @@ InitaliseGame: ; Begin subroutine
 	STA sprite_player + SPRITE_ATTRIB
 	LDA #128	; xPos
 	STA sprite_player + SPRITE_X
-	
-	; Write sprite data for enemy bullet. xPos is in the middle, comes down from the top.
-	;LDA #30		; yPos
-	;STA sprite_bullet_enemy + SPRITE_Y
-	;LDA #16		; Tile number
-	;STA sprite_bullet_enemy + SPRITE_TILE
-	;LDA #0		; Attributes
-	;STA sprite_bullet_enemy + SPRITE_ATTRIB
-	;LDA #128	; xPos
-	;STA sprite_bullet_enemy + SPRITE_X
-	
 	
 	; Write sprite data for follower, starts off screen.
 	LDA #$FF	; yPos
@@ -504,26 +493,9 @@ UpdateBullet_Done:
 
 	
 UpdateBullet_Done_Follower:
-
-	; Check if the enemies bullet is active.
-	;LDA bullet_active_enemy
-	;BEQ Update_EnemyBullet_Done
-
-	; Update enemies bullet.
-	;LDA sprite_bullet_enemy + SPRITE_Y
-	;SEC
-	;ADC #1
-	;STA sprite_bullet_enemy + SPRITE_Y
-	; Check if the bullet has left the screen.
-	;BNE Update_EnemyBullet_Done
-	;LDA #0
-	;STA bullet_active_enemy
 	
-	
-	; Check if the enemy bullets are active.
-	
-
-
+	LDA NUM_ENEMY_BULLETS * ENEMY_SPACING
+	STA temp_x
 	LDX #0
 Bullet_Movement_Loop:
 
@@ -736,6 +708,7 @@ CheckCollisionWithPlayer .macro; parameters: objectX, objectY, object_hit_x, obj
 	; If there is a collision the code will continue from after the macro.
 	; If there is no collision then it will continue from the no_collision_label
 	
+
 	LDA sprite_player+SPRITE_X 	; Calculate enemyPosX - bulletWidth - 1 (x1 - w2 - 1)
 	.if \3 > 0
 	SEC
@@ -770,7 +743,19 @@ CheckCollisionWithPlayer .macro; parameters: objectX, objectY, object_hit_x, obj
 
 	
 	; Check if enemy bullet collides with player.
-	CheckCollisionWithPlayer sprite_bullet_enemy+SPRITE_X, sprite_bullet_enemy+SPRITE_Y, #0, #0, #8, #8, UpdatePlayer_NoEnemyBulletCollision
+	
+	LDA #NUM_ENEMY_BULLETS
+	STA temp_value
+	LDX #0
+EnemyBullet_Collision_Loop:
+	
+	
+	LDA sprite_bullet_enemy+SPRITE_X, x
+	STA temp_x
+	LDA sprite_bullet_enemy+SPRITE_Y, x
+	STA temp_y
+	
+	CheckCollisionWithPlayer temp_x, temp_y, #0, #0, #8, #8, UpdatePlayer_NoEnemyBulletCollision
 	
 	; Handle player + enemy bullet collision.
 	LDA HAS_FOLLOWER
@@ -780,7 +765,10 @@ CheckCollisionWithPlayer .macro; parameters: objectX, objectY, object_hit_x, obj
 	LDA #0						; Store 0 to represent false.
 	STA HAS_FOLLOWER			; Set the Has_Follower to false.
 	LDA #$FF 					; Store hex equivalent to 255
-	STA sprite_bullet_enemy + SPRITE_Y		; Move sprite off the screen.
+	STA sprite_bullet_enemy + SPRITE_Y, x		; Move sprite off the screen.
+	
+	LDA #0
+	STA bullet_active_enemy, x
 	
 	JMP UpdatePlayer_NoEnemyBulletCollision		; Jump to the end of the bullet collision with player code.
 	
@@ -790,6 +778,19 @@ NoFollower_OnCollision:			; No follower will result in this code being run.
 
 	
 UpdatePlayer_NoEnemyBulletCollision:
+	
+	
+	; Increment loop.
+	TXA
+	CLC
+	ADC #4
+	TAX
+	; Check if loop is finished.
+	LDA temp_value
+	SEC
+	SBC #1
+	STA temp_value
+	BNE EnemyBullet_Collision_Loop
 	
 	
 	;copy sprite data to the PPU.
