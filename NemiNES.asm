@@ -5,6 +5,8 @@
   
   ;---------------------------------
   
+  
+; Store references to positions in memory.
 PPUCTRL = $2000
 PPUMASK = $2001
 PPUSTATUS = $2002
@@ -17,6 +19,7 @@ OAMDMA = $4014
 JOYPAD1 = $4016
 JOYPAD2 = $4017
 
+; Stores the offsets to access specific buttons on the controller.
 BUTTON_A 		= %10000000
 BUTTON_B 		= %01000000
 BUTTON_SELECT 	= %00100000
@@ -26,45 +29,50 @@ BUTTON_DOWN 	= %00000100
 BUTTON_LEFT 	= %00000010
 BUTTON_RIGHT 	= %00000001
 
+; Store information about enemies.
 ENEMY_SQUAD_WIDTH = 6
 ENEMY_SQUAD_HEIGHT = 4
 NUM_ENEMIES = ENEMY_SQUAD_WIDTH * ENEMY_SQUAD_HEIGHT
 ENEMY_SPACING = 16
 ENEMY_DESCENT_SPEED = 4
 
+; Store information about enemies.
 	.rsset $0010
 joypad1_state .rs 1
-bullet_active .rs 1
-bullet_active_follower .rs 1
-bullet_active_enemy .rs 1	
-hand_active .rs 1
+bullet_active .rs 1						; Store whether the player's bullet is active or not.
+bullet_active_follower .rs 1			; Store whether the follower's bullet is active or not.
+bullet_active_enemy .rs 1				; Store whether the enemies bullet is active or not.
+hand_active .rs 1						; Store whether the player's hand to gain followers is active.
 temp_x .rs 1
 temp_y .rs 1
-hand_framesActive .rs 1
-hand_framesToDespawn .rs 1
+hand_framesActive .rs 1					; Counts down frames 
+hand_framesToDespawn .rs 1				; Stores how many frames 
 enemy_info .rs 4 * NUM_ENEMIES
 
 
+;Stores sprite information: yPos, tile from the sprite sheet, colour palette attribute, xPos
 	.rsset $0200
-sprite_player .rs 4
-sprite_bullet .rs 4 
-sprite_bullet_follower .rs 4
-sprite_hand .rs 4
-sprite_enemy0 .rs 4 * NUM_ENEMIES
-sprite_follower .rs 4
-sprite_bullet_enemy .rs 4
+sprite_player .rs 4						; Stores the player sprite.
+sprite_bullet .rs 4 					; Stores the player's bullet sprite.
+sprite_bullet_follower .rs 4			; Stores the follower's bullet sprite.
+sprite_hand .rs 4						; Stores the player's hand sprite.
+sprite_enemy0 .rs 4 * NUM_ENEMIES		; Stores enemy sprite for the number of enemies specified.
+sprite_follower .rs 4					; Stores the player's follower sprite.
+sprite_bullet_enemy .rs 4				; Stores the enemy bullet sprite.
+
+; Stores offsets to easily call information from sprites.
+	.rsset $0000
+SPRITE_Y .rs 1			; Sprite's yPos - +1
+SPRITE_TILE .rs 1		; Sprite's sprite sheet tile - +2
+SPRITE_ATTRIB .rs 1		; Sprite's colour palette - +3
+SPRITE_X .rs 1			; Sprite's xPos - +4
 
 	.rsset $0000
-SPRITE_Y .rs 1
-SPRITE_TILE .rs 1
-SPRITE_ATTRIB .rs 1
-SPRITE_X .rs 1
+ENEMY_SPEED .rs 1		; Store's how many pixels the enemies move per frame.
+ENEMY_ALIVE .rs 1		; Store's whether the enemy is alive or not. Used to decide if the enemy should be skipped in the loop.
 
-	.rsset $0000
-ENEMY_SPEED .rs 1
-ENEMY_ALIVE .rs 1
-ENEMY_FOLLOWING .rs 1
 
+; Store information about colliders.
 ENEMY_HITBOX_WIDTH = 8
 ENEMY_HITBOX_HEIGHT = 8
 
@@ -78,6 +86,7 @@ HAND_HITBOX_HEIGHT = 8
 HAND_X = 0
 HAND_Y = 0
 
+; Other information.
 BULLET_SPEED = 3
 
 HAS_FOLLOWER = 0
@@ -167,7 +176,7 @@ InitaliseGame: ; Begin subroutine
 	; Reset the PPU high/low latch
 	LDA PPUSTATUS
 	
-	; Write address 3F10 to the PPU
+	; Write address 3F10 to the PPU .
 	; 3F10 is where the background colour is stored
 	; 3F10 has to be done in two parts as NES can only handle two digits at a time.
 	; These values don't override each other because 2006 is a special memory location
@@ -176,55 +185,55 @@ InitaliseGame: ; Begin subroutine
 	LDA #$10
 	STA PPUADDR
 	
-	; Write the colour to the PPU.
-	LDA #$04					; Defines the colour
+	; Write the background colour to the PPU.
+	LDA #$FF					; Defines the colour of the background
 	STA PPUDATA
 	
 	
 	; Write colour palletes
 	; Stores sprite colours for the enemies
-	LDA #$19
+	LDA #$19				; Light green.
 	STA PPUDATA
 	
-	LDA #$09
+	LDA #$09				; Dark green.
 	STA PPUDATA
 	
-	LDA #$30
+	LDA #$30				; White.
 	STA PPUDATA
 	
 	; Stores sprite colours for the player
-	LDA #$06
+	LDA #$06				; Red/Brown
+	STA PPUDATA
+		
+	LDA #$30				; White.
 	STA PPUDATA
 	
-	LDA #$30
-	STA PPUDATA
-	
-	LDA #$36
+	LDA #$36				; Pale pink - for skin colour.
 	STA PPUDATA
 	
 	; Stores sprite colours for the arrow
 	
-	LDA #$17
+	LDA #$17				; Light brown.
 	STA PPUDATA
 	
-	LDA #$00
+	LDA #$00				; Dark grey.
 	STA PPUDATA
 	
-	LDA #$20
+	LDA #$20				; Green
 	STA PPUDATA
 	
 	; Store sprite colours for the hand
-	LDA #$36
+	LDA #$36				; Pale pink.
 	STA PPUDATA
 	
-	LDA #$11
-	STA PPUDATA
+	LDA #$11				; Blue.
+	STA PPUDATA		
 	
-	LDA #$33
+	LDA #$33				; Lavender colour
 	STA PPUDATA
 	
 	; Define data for hand time alive
-	LDA #60
+	LDA #60							; Will stay alive for 60 seconds. NES does 60 fps, so this is for one second.
 	STA hand_framesToDespawn
  
 	
@@ -239,64 +248,66 @@ InitaliseGame: ; Begin subroutine
 	LDA #128	; xPos
 	STA sprite_player + SPRITE_X
 	
-	; Write sprite data for enemy bullet.
-	LDA #60
+	; Write sprite data for enemy bullet. xPos is in the middle, comes down from the top.
+	LDA #0		; yPos
 	STA sprite_bullet_enemy + SPRITE_Y
-	LDA #16
+	LDA #16		; Tile number
 	STA sprite_bullet_enemy + SPRITE_TILE
-	LDA #0
+	LDA #0		; Attributes
 	STA sprite_bullet_enemy + SPRITE_ATTRIB
-	LDA #128
+	LDA #128	; xPos
 	STA sprite_bullet_enemy + SPRITE_X
 	
-	; Write sprite data for follower
-	LDA #$FF
+	; Write sprite data for follower, starts off screen.
+	LDA #$FF	; yPos
 	STA sprite_follower + SPRITE_Y
-	LDA #1
+	LDA #1		; tile number, attribute, xPos.
 	STA sprite_follower + SPRITE_TILE
 	STA sprite_follower + SPRITE_ATTRIB
 	STA sprite_follower + SPRITE_X
 	
 	; Initialise enemies
-	LDX #0
-	LDA #ENEMY_SQUAD_HEIGHT * ENEMY_SPACING
-	STA temp_y
+	LDX #0										; Store 0 in X	
+	LDA #ENEMY_SQUAD_HEIGHT * ENEMY_SPACING		; Load the Y pos of the enemies, from the height given and the given spacing between enemies.
+	STA temp_y									; Store the calculated y pos.
 InitEnemiesLoopY:
-	LDA #ENEMY_SQUAD_WIDTH * ENEMY_SPACING
-	STA temp_x
+	LDA #ENEMY_SQUAD_WIDTH * ENEMY_SPACING		; Load the xPos of the enemies, from the width and spacing.
+	STA temp_x									; Store the calculated xPos.
 InitEnemiesLoopX:
-	; Accumlator = temp_x here
-	STA sprite_enemy0 + SPRITE_X, x
-	LDA temp_y
-	STA sprite_enemy0 + SPRITE_Y, x
-	LDA #0
-	STA sprite_enemy0 + SPRITE_ATTRIB, x
-	LDA #1
-	STA sprite_enemy0 + SPRITE_TILE, x
-	STA enemy_info+ENEMY_SPEED, x
-	STA enemy_info+ENEMY_ALIVE, x
-	STA enemy_info+ENEMY_FOLLOWING, x
+	; Accumlator still has the calculated x Pos stored.
+	STA sprite_enemy0 + SPRITE_X, x				; Give the enemy sprite the calculated x pos.
+	LDA temp_y									; Load the calculated y pos.
+	STA sprite_enemy0 + SPRITE_Y, x				; Give the enemy sprite the calculated y pos.	
+	LDA #0										; Load 0.
+	STA sprite_enemy0 + SPRITE_ATTRIB, x		; Store 0 in the colour palette attribute
+	LDA #1										; Load 1.
+	STA sprite_enemy0 + SPRITE_TILE, x			; Give the sprite tile the value 1. Set the sprite that is shown to the 2nd tile in the sprite sheet.
+	STA enemy_info+ENEMY_SPEED, x				; Give the enemies speed a value of 1.
+	STA enemy_info+ENEMY_ALIVE, x				; Set the enemy to alive.
+	
 	; Increase X by 4 per loop (one for each bit used in sprite data).
 	TXA
 	CLC
 	ADC #4
 	TAX
+	
 	; Loop check for x value
-	LDA temp_x
-	SEC
-	SBC #ENEMY_SPACING
-	STA temp_x
-	BNE InitEnemiesLoopX
+	LDA temp_x				; Load the current x pos that was used in the loop.
+	SEC						; Set the carry flag.
+	SBC #ENEMY_SPACING		; Take away spacing between enemies.
+	STA temp_x				; Store new value.
+	BNE InitEnemiesLoopX	; If not 0 branch back to start of x loop.
+	
 	; Loop check for y value
-	LDA temp_y
+	LDA temp_y				; Load the current y pos.
 	SEC
-	SBC #ENEMY_SPACING
-	STA temp_y
-	BNE InitEnemiesLoopY
+	SBC #ENEMY_SPACING		; Take the enemy spacing away.
+	STA temp_y				; Store new Y pos.
+	BNE InitEnemiesLoopY	; If not 0 loop back to start of y loop.
 	
 	RTS ; End subroutine
   
-; end of inifnate loop
+; end of infinite loop
   
 ;----------------------------------------------------------------------------
 
@@ -313,31 +324,31 @@ NMI:
 	LDX #0
 	STX joypad1_state
 ReadController:
-	LDA JOYPAD1
-	LSR A
-	ROL joypad1_state
-	INX
-	CPX #8
-	BNE ReadController
+	LDA JOYPAD1				; Load the value stored at JOYPAD1
+	LSR A					; Logical shift right of A.
+	ROL joypad1_state		; rotate bits in joypad1_state
+	INX						; Increment x.
+	CPX #8					; Compare x against 8.
+	BNE ReadController		; Branch to ReadController if not 8.
 	
 	; React to Right button
-	LDA joypad1_state
-	AND #BUTTON_RIGHT
-	BEQ ReadRight_Done
-	LDA sprite_player + SPRITE_X
-	CLC
-	ADC #1
-	STA sprite_player + SPRITE_X
+	LDA joypad1_state		; Load joypad1_state	
+	AND #BUTTON_RIGHT		; Offset to get the right button.
+	BEQ ReadRight_Done		; Skip if not pressed.
+	LDA sprite_player + SPRITE_X	; Load the players x pos.
+	CLC								; Clear carry flag.
+	ADC #1							; Add 1 to the x pos.
+	STA sprite_player + SPRITE_X	; Store new x pos.
 ReadRight_Done:
 
 	;React to Left button
-	LDA joypad1_state
-	AND #BUTTON_LEFT
-	BEQ ReadLeft_Done
-	LDA sprite_player + SPRITE_X
-	CLC
-	ADC #-1
-	STA sprite_player + SPRITE_X
+	LDA joypad1_state		; Load joypad1_state	
+	AND #BUTTON_LEFT		; Offset to get the left button.
+	BEQ ReadLeft_Done		; Skip if not pressed.
+	LDA sprite_player + SPRITE_X		; Load the the player's x pos.
+	CLC									; Clear carry flag.
+	ADC #-1								; Take 1 from the x pos.
+	STA sprite_player + SPRITE_X		; Store new x pos.
 	
 ReadLeft_Done:
 
@@ -345,10 +356,10 @@ ReadLeft_Done:
 	LDA joypad1_state
 	AND #BUTTON_UP
 	BEQ ReadUp_Done
-	LDA sprite_player + SPRITE_Y
-	CLC
-	ADC #-1
-	STA sprite_player + SPRITE_Y
+	LDA sprite_player + SPRITE_Y	; Load players y pos.
+	CLC								; Clear carry flag.
+	ADC #-1							; Take 1 from the y pos (move up).
+	STA sprite_player + SPRITE_Y	; Store new y.
 	
 ReadUp_Done:	
 
@@ -356,10 +367,10 @@ ReadUp_Done:
 	LDA joypad1_state
 	AND #BUTTON_DOWN
 	BEQ ReadDown_Done
-	LDA sprite_player + SPRITE_Y
-	CLC
-	ADC #1
-	STA sprite_player + SPRITE_Y
+	LDA sprite_player + SPRITE_Y	; Load player's y pos.
+	CLC								; Clear carry flag.	
+	ADC #1							; Add 1 to y pos.
+	STA sprite_player + SPRITE_Y	; Store new y.
 	
 ReadDown_Done:	
 
@@ -482,25 +493,26 @@ UpdateBullet_Done_Follower:
 	
 HandUpdate_Done:
 
-	LDA HAS_FOLLOWER
-	BEQ No_Follower
+	LDA HAS_FOLLOWER		; Load the value of HAS_FOLLOWER
+	BEQ No_Follower			; If  = 1, no follower so branch to no follower.
 	
 
-Has_Follower:
 
-	LDA sprite_player + SPRITE_Y
-	ADC #10
-	STA sprite_follower + SPRITE_Y
-	LDA sprite_player + SPRITE_X
-	STA sprite_follower + SPRITE_X
-	JMP FollowerUpdate_Done
+; Has a follower.
+; Place the follower sprite underneath the player.
+	LDA sprite_player + SPRITE_Y	; Load player y pos.
+	ADC #10							; Add 10
+	STA sprite_follower + SPRITE_Y	; Give follower new y pos.
+	LDA sprite_player + SPRITE_X	; Load the players x pos.
+	STA sprite_follower + SPRITE_X	; Give the follower new x pos.
+	JMP FollowerUpdate_Done			; Jump to after the no follower code.
 
 No_Follower:
-	LDA #$FF
-	STA sprite_follower + SPRITE_Y
+	LDA #$FF						; Load hex equivalent of 255  (off screen)
+	STA sprite_follower + SPRITE_Y	; Give the follower sprite the new y pos.
 	
-	LDA #0
-	STA sprite_follower + SPRITE_X
+	LDA #0							; Load 0.
+	STA sprite_follower + SPRITE_X	; Give follower new x pos.
 	
 
 FollowerUpdate_Done:
@@ -511,41 +523,34 @@ FollowerUpdate_Done:
 UpdateEnemiesLoop:
 	;Check if enemy is alive
 	LDA enemy_info + ENEMY_ALIVE, x
-	BNE UpdateEnemies_Start
-	JMP UpdateEnemies_Next
+	BNE UpdateEnemies_Start				; Branch to handling enemy movement.
+	JMP UpdateEnemies_Next				; Jump to end of this increment of the loop.
 UpdateEnemies_Start:
-
-	LDA enemy_info + ENEMY_FOLLOWING, x		; Check if the enemy is following the player.
-	BNE EnemiesInFormation					; Branch to after if not.
-	
-	LDA sprite_player + SPRITE_X			; Load players's x pos.
-	STA sprite_enemy0 + SPRITE_X, x			; Set enemies x pos to players.
-	LDA sprite_player + SPRITE_Y			; Load player's y pos
-	ADC #10									; Add offset to player's y pos.
-	STA sprite_enemy0 + SPRITE_Y, x			; Store enemies new y pos 
-	JMP UpdateEnemies_Next
 EnemiesInFormation:
-	LDA sprite_enemy0 + SPRITE_X, x
-	CLC
-	ADC enemy_info + ENEMY_SPEED, x
-	STA sprite_enemy0 + SPRITE_X, x
-	CMP #256 - ENEMY_SPACING
-	BCS UpdateEnemies_Reverse
-	CMP #ENEMY_SPACING
-	BCC UpdateEnemies_Reverse
-	JMP UpdateEnemies_NoReverse
+	LDA sprite_enemy0 + SPRITE_X, x		; Load sprite x pos.
+	CLC									; Clear carry flag.
+	ADC enemy_info + ENEMY_SPEED, x		; Add enemies speed. Moves the enemy along that number of pixels.
+	STA sprite_enemy0 + SPRITE_X, x		; Store new x pos.
+	CMP #256 - ENEMY_SPACING			; See if the enemy has collided with the right end of the screen.
+	BCS UpdateEnemies_Reverse			; If has then reverse then branch to enemy reverse.
+	CMP #ENEMY_SPACING					; See if the enemy has collided with the left end of the screen.
+	BCC UpdateEnemies_Reverse			; Branch to reverse if so.
+	JMP UpdateEnemies_NoReverse			; If not branched then skip over the reverse code.
+	
 UpdateEnemies_Reverse:
 	; Reverse Enemy Direction
-	LDA #0
-	SEC
-	SBC enemy_info+ENEMY_SPEED, x
-	STA enemy_info+ENEMY_SPEED, x
-	LDA sprite_enemy0+SPRITE_Y, x
-	CLC
-	ADC #ENEMY_DESCENT_SPEED
-	STA sprite_enemy0+SPRITE_Y, x
+	LDA #0							; Load 0.
+	SEC								
+	SBC enemy_info+ENEMY_SPEED, x	; Take current enemy speed from 0. If the speed was 1 it's 0 - 1 so the new speed is negative. If the speed is -1 then it's 0 - -1 which is 1.
+	STA enemy_info+ENEMY_SPEED, x	; Store new speed.
+	LDA sprite_enemy0+SPRITE_Y, x	; Load sprite's y pos.
+	CLC								; Clear carry flag.
+	ADC #ENEMY_DESCENT_SPEED		; Add the enemy descent speed. Moves the enemies down when they hit the side.
+	STA sprite_enemy0+SPRITE_Y, x	; Store new y pos.
 		
 UpdateEnemies_NoReverse 
+
+	; Begin handling collisions.
 											 ;\1		\2		\3				\4			\5			\6			\7
 CheckCollisionWithEnemy .macro ; parameters: object_x, object_y, object_hit_x, object_hit_y, object_w, object_h, no_collision_label
 	; If there is a collision, execution continues immediately after this macro
