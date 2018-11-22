@@ -35,14 +35,15 @@ ENEMY_SQUAD_HEIGHT = 4
 NUM_ENEMIES = ENEMY_SQUAD_WIDTH * ENEMY_SQUAD_HEIGHT
 ENEMY_SPACING = 16
 ENEMY_DESCENT_SPEED = 4
+NUM_ENEMY_BULLETS = 5
 
 ; Store information about enemies.
 	.rsset $0010
 joypad1_state .rs 1
-bullet_active .rs 1						; Store whether the player's bullet is active or not.
-bullet_active_follower .rs 1			; Store whether the follower's bullet is active or not.
-bullet_active_enemy .rs 1				; Store whether the enemies bullet is active or not.
-hand_active .rs 1						; Store whether the player's hand to gain followers is active.
+bullet_active .rs 1									; Store whether the player's bullet is active or not.
+bullet_active_follower .rs 1						; Store whether the follower's bullet is active or not.
+bullet_active_enemy .rs 1 * NUM_ENEMY_BULLETS		; Store whether the enemies bullet is active or not.
+hand_active .rs 1									; Store whether the player's hand to gain followers is active.
 temp_x .rs 1
 temp_y .rs 1
 hand_framesActive .rs 1					; Counts down frames 
@@ -58,7 +59,7 @@ sprite_bullet_follower .rs 4			; Stores the follower's bullet sprite.
 sprite_hand .rs 4						; Stores the player's hand sprite.
 sprite_enemy0 .rs 4 * NUM_ENEMIES		; Stores enemy sprite for the number of enemies specified.
 sprite_follower .rs 4					; Stores the player's follower sprite.
-sprite_bullet_enemy .rs 4				; Stores the enemy bullet sprite.
+sprite_bullet_enemy .rs 4 * NUM_ENEMY_BULLETS			; Stores the enemy bullet sprite.
 
 ; Stores offsets to easily call information from sprites.
 	.rsset $0000
@@ -249,14 +250,15 @@ InitaliseGame: ; Begin subroutine
 	STA sprite_player + SPRITE_X
 	
 	; Write sprite data for enemy bullet. xPos is in the middle, comes down from the top.
-	LDA #0		; yPos
-	STA sprite_bullet_enemy + SPRITE_Y
-	LDA #16		; Tile number
-	STA sprite_bullet_enemy + SPRITE_TILE
-	LDA #0		; Attributes
-	STA sprite_bullet_enemy + SPRITE_ATTRIB
-	LDA #128	; xPos
-	STA sprite_bullet_enemy + SPRITE_X
+	;LDA #30		; yPos
+	;STA sprite_bullet_enemy + SPRITE_Y
+	;LDA #16		; Tile number
+	;STA sprite_bullet_enemy + SPRITE_TILE
+	;LDA #0		; Attributes
+	;STA sprite_bullet_enemy + SPRITE_ATTRIB
+	;LDA #128	; xPos
+	;STA sprite_bullet_enemy + SPRITE_X
+	
 	
 	; Write sprite data for follower, starts off screen.
 	LDA #$FF	; yPos
@@ -265,6 +267,35 @@ InitaliseGame: ; Begin subroutine
 	STA sprite_follower + SPRITE_TILE
 	STA sprite_follower + SPRITE_ATTRIB
 	STA sprite_follower + SPRITE_X
+	
+	; Initalise enemy bullets
+	LDX #0
+	LDA #NUM_ENEMY_BULLETS * ENEMY_SPACING
+	STA temp_x
+InitEnemiesBulletLoop:
+	STA sprite_bullet_enemy + SPRITE_X, x		; Set x position.
+	LDA #30										; Load starting y pos.
+	STA sprite_bullet_enemy + SPRITE_Y, x		; Store new y pos.
+	LDA #0		; Attributes
+	STA sprite_bullet_enemy + SPRITE_ATTRIB, x
+	LDA #16
+	STA sprite_bullet_enemy + SPRITE_TILE, x
+	LDA #1
+	STA bullet_active_enemy, x
+	
+	; Increase X by 4.
+	TXA
+	CLC
+	ADC #4
+	TAX
+	
+	; Check if the loop is finished.
+	LDA temp_x
+	SEC
+	SBC #ENEMY_SPACING
+	STA temp_x
+	BNE InitEnemiesBulletLoop
+	
 	
 	; Initialise enemies
 	LDX #0										; Store 0 in X	
@@ -474,10 +505,59 @@ UpdateBullet_Done:
 	
 UpdateBullet_Done_Follower:
 
+	; Check if the enemies bullet is active.
+	;LDA bullet_active_enemy
+	;BEQ Update_EnemyBullet_Done
+
 	; Update enemies bullet.
-	LDA sprite_bullet_enemy + SPRITE_Y
-	ADC #1
-	STA sprite_bullet_enemy + SPRITE_Y
+	;LDA sprite_bullet_enemy + SPRITE_Y
+	;SEC
+	;ADC #1
+	;STA sprite_bullet_enemy + SPRITE_Y
+	; Check if the bullet has left the screen.
+	;BNE Update_EnemyBullet_Done
+	;LDA #0
+	;STA bullet_active_enemy
+	
+	
+	; Check if the enemy bullets are active.
+	
+
+
+	LDX #0
+Bullet_Movement_Loop:
+
+	LDA bullet_active_enemy, x					; Load if the bullet is active.
+	BEQ Increment_Enemy_Bullet_Loop
+
+	LDA sprite_bullet_enemy + SPRITE_Y, x		; Load Y position.
+	ADC #1										; Add bullet move speed.
+	SEC
+	STA sprite_bullet_enemy + SPRITE_Y, x		; Set new x pixel position.
+	
+	; Check if the bullet has left the screen. If So diable all of them.
+	BNE Increment_Enemy_Bullet_Loop
+	LDA #0
+	STA bullet_active_enemy, x
+	JMP Update_EnemyBullet_Done
+
+
+Increment_Enemy_Bullet_Loop:	
+	; Increase X by 4.
+	TXA
+	CLC
+	ADC #4
+	TAX
+	
+	; Check if the loop is finished.
+	LDA temp_x
+	SEC
+	SBC #ENEMY_SPACING
+	STA temp_x
+	BNE Bullet_Movement_Loop
+
+	
+Update_EnemyBullet_Done:
 
 ; Handle the hand rendering
 	LDA hand_active
@@ -488,7 +568,7 @@ UpdateBullet_Done_Follower:
 	STA hand_framesActive
 	BNE HandUpdate_Done		; Check if the hand needs to be reset.
 	LDA #0					; Load 0 into the accumulator.
-	STA hand_active			; Set the hand_active to 0 so it is not active.
+	STA hand_active			; Set the hand_active to 0 so it is active.
 	STA sprite_hand + SPRITE_Y 	; Set the hand's y position to offscreen.
 	
 HandUpdate_Done:
