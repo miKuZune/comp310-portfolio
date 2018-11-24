@@ -60,7 +60,7 @@ sprite_bullet_follower .rs 4			; Stores the follower's bullet sprite.
 sprite_hand .rs 4						; Stores the player's hand sprite.
 sprite_enemy0 .rs 4 * NUM_ENEMIES		; Stores enemy sprite for the number of enemies specified.
 sprite_follower .rs 4					; Stores the player's follower sprite.
-sprite_bullet_enemy .rs 4 * NUM_ENEMY_BULLETS			; Stores the enemy bullet sprite.
+sprite_bullet_enemy .rs 4			; Stores the enemy bullet sprite.
 
 ; Stores offsets to easily call information from sprites.
 	.rsset $0000
@@ -258,32 +258,17 @@ InitaliseGame: ; Begin subroutine
 	STA sprite_follower + SPRITE_X
 	
 	; Initalise enemy bullets
-	LDX #0
-	LDA #NUM_ENEMY_BULLETS * ENEMY_SPACING
-	STA temp_x
-InitEnemiesBulletLoop:
-	STA sprite_bullet_enemy + SPRITE_X, x		; Set x position.
+	
+	LDA #124
+	STA sprite_bullet_enemy + SPRITE_X	; Set x position.
 	LDA #30										; Load starting y pos.
-	STA sprite_bullet_enemy + SPRITE_Y, x		; Store new y pos.
+	STA sprite_bullet_enemy + SPRITE_Y		; Store new y pos.
 	LDA #0		; Attributes
-	STA sprite_bullet_enemy + SPRITE_ATTRIB, x
+	STA sprite_bullet_enemy + SPRITE_ATTRIB
 	LDA #16
-	STA sprite_bullet_enemy + SPRITE_TILE, x
+	STA sprite_bullet_enemy + SPRITE_TILE
 	LDA #1
-	STA bullet_active_enemy, x
-	
-	; Increase X by 4.
-	TXA
-	CLC
-	ADC #4
-	TAX
-	
-	; Check if the loop is finished.
-	LDA temp_x
-	SEC
-	SBC #ENEMY_SPACING
-	STA temp_x
-	BNE InitEnemiesBulletLoop
+	STA bullet_active_enemy
 	
 	
 	; Initialise enemies
@@ -434,7 +419,6 @@ ReadDown_Done:
 	STA sprite_bullet_follower + SPRITE_ATTRIB	; Store new palette
 	LDA sprite_player + SPRITE_X				; Store player's x position
 	STA sprite_bullet_follower + SPRITE_X		; Set follower's bullet x position to be that of the players.
-	NOP
 ReadA_Done:
 
 ;React to B button
@@ -490,45 +474,29 @@ UpdateBullet_Done:
 	BCS UpdateBullet_Done_Follower
 	LDA #0
 	STA bullet_active_follower
-
 	
 UpdateBullet_Done_Follower:
 	
-	LDA NUM_ENEMY_BULLETS * ENEMY_SPACING
-	STA temp_x
-	LDX #0
-Bullet_Movement_Loop:
+	LDA bullet_active_enemy					; Load if the bullet is active.
+	BEQ Update_EnemyBullet_Done
 
-	LDA bullet_active_enemy, x					; Load if the bullet is active.
-	BEQ Increment_Enemy_Bullet_Loop
-
-	LDA sprite_bullet_enemy + SPRITE_Y, x		; Load Y position.
-	ADC #1										; Add bullet move speed.
+	LDA sprite_bullet_enemy + SPRITE_Y		; Load Y position.
+	ADC #1									; Add bullet move speed.
 	SEC
-	STA sprite_bullet_enemy + SPRITE_Y, x		; Set new x pixel position.
+	STA sprite_bullet_enemy + SPRITE_Y		; Set new x pixel position.
 	
-	; Check if the bullet has left the screen. If So diable all of them.
-	BNE Increment_Enemy_Bullet_Loop
+	; Check if the bullet has left the screen. Disable if true.
+	CMP #$FF
+	BCC CheckBulletAt0
 	LDA #0
-	STA bullet_active_enemy, x
-	JMP Update_EnemyBullet_Done
-
-
-Increment_Enemy_Bullet_Loop:	
-	; Increase X by 4.
-	TXA
-	CLC
-	ADC #4
-	TAX
+	STA bullet_active_enemy
 	
-	; Check if the loop is finished.
-	LDA temp_x
-	SEC
-	SBC #ENEMY_SPACING
-	STA temp_x
-	BNE Bullet_Movement_Loop
+CheckBulletAt0:	
+	CMP #$FF - 1
+	BCC Update_EnemyBullet_Done
+	LDA #0
+	STA bullet_active_enemy
 
-	
 Update_EnemyBullet_Done:
 
 ; Handle the hand rendering
@@ -578,6 +546,19 @@ UpdateEnemiesLoop:
 	BNE UpdateEnemies_Start				; Branch to handling enemy movement.
 	JMP UpdateEnemies_Next				; Jump to end of this increment of the loop.
 UpdateEnemies_Start:
+	; Check to see if the enemy bullet needs to be re activated.
+	LDA bullet_active_enemy
+	BNE EnemiesInFormation
+	; Make bullet active and set new position to be the enemies position.
+	LDA #1
+	STA bullet_active_enemy
+	
+	LDA sprite_enemy0 + SPRITE_X, x
+	STA sprite_bullet_enemy + SPRITE_X
+	
+	LDA sprite_enemy0 + SPRITE_Y, x
+	STA sprite_bullet_enemy + SPRITE_Y
+
 EnemiesInFormation:
 	LDA sprite_enemy0 + SPRITE_X, x		; Load sprite x pos.
 	CLC									; Clear carry flag.
@@ -743,16 +724,10 @@ CheckCollisionWithPlayer .macro; parameters: objectX, objectY, object_hit_x, obj
 
 	
 	; Check if enemy bullet collides with player.
-	
-	LDA #NUM_ENEMY_BULLETS
-	STA temp_value
-	LDX #0
-EnemyBullet_Collision_Loop:
-	
-	
-	LDA sprite_bullet_enemy+SPRITE_X, x
+		
+	LDA sprite_bullet_enemy+SPRITE_X
 	STA temp_x
-	LDA sprite_bullet_enemy+SPRITE_Y, x
+	LDA sprite_bullet_enemy+SPRITE_Y
 	STA temp_y
 	
 	CheckCollisionWithPlayer temp_x, temp_y, #0, #0, #8, #8, UpdatePlayer_NoEnemyBulletCollision
@@ -765,33 +740,21 @@ EnemyBullet_Collision_Loop:
 	LDA #0						; Store 0 to represent false.
 	STA HAS_FOLLOWER			; Set the Has_Follower to false.
 	LDA #$FF 					; Store hex equivalent to 255
-	STA sprite_bullet_enemy + SPRITE_Y, x		; Move sprite off the screen.
+	STA sprite_bullet_enemy + SPRITE_Y		; Move sprite off the screen.
 	
 	LDA #0
-	STA bullet_active_enemy, x
+	STA bullet_active_enemy
 	
 	JMP UpdatePlayer_NoEnemyBulletCollision		; Jump to the end of the bullet collision with player code.
+	
+
 	
 NoFollower_OnCollision:			; No follower will result in this code being run.
 	JSR InitaliseGame
 	JMP UpdateEnemies_End
+	
 
-	
 UpdatePlayer_NoEnemyBulletCollision:
-	
-	
-	; Increment loop.
-	TXA
-	CLC
-	ADC #4
-	TAX
-	; Check if loop is finished.
-	LDA temp_value
-	SEC
-	SBC #1
-	STA temp_value
-	BNE EnemyBullet_Collision_Loop
-	
 	
 	;copy sprite data to the PPU.
 	LDA #0
@@ -817,5 +780,3 @@ UpdatePlayer_NoEnemyBulletCollision:
 	.bank 2
 	.org $0000
 	.incbin "Sprites.nes"
-	
-	
